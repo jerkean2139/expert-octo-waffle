@@ -206,7 +206,53 @@ Wired real Claude API integration and agent routing:
 12. Graceful degradation: shows mock data in DEMO mode when backend offline, switches to LIVE when connected
 13. API routes: GET /api/tasks, POST /api/tasks, PATCH /api/tasks/:id/status, GET /api/events (SSE)
 
-**Phase 3 — Next: Database, Auth, Memory Engine**
+**Phase 3 — Database, Auth, Memory Engine** (COMPLETE)
+
+### Database (Drizzle ORM + PostgreSQL)
+- Full schema: tenants, users, invites, agent_definitions, tasks, memories, iq_scores, memory_reports, overrides, browser_sessions
+- Row-Level Security on ALL tenant-scoped tables
+- `set_config('app.current_tenant_id')` pattern for RLS
+- Super Admin bypass policies
+- Global memory read policy (org-level memories visible to all)
+- Indexes on tenant_id + common query patterns
+- RLS SQL script ready for deployment (server/db/rls.sql)
+- Drizzle config for migrations (drizzle.config.ts)
+
+### Auth Layer
+- JWT token signing/verification (server/auth/jwt.ts)
+- 5-tier role matrix: Super Admin → Agency Admin → Project Lead → Builder → Client Viewer
+- Permission system with `hasPermission()` and `isRoleAtLeast()` checks
+- Express middleware: `authenticate()`, `authorize()`, `requireRole()`
+- Google OAuth + Microsoft OAuth configuration and code exchange
+- Demo login endpoint for development (`POST /api/auth/demo`)
+- .env.example with all required environment variables
+
+### 5-Layer Memory Engine
+1. **Episodic** — conversation + session logs (high confidence 0.95)
+2. **Semantic** — facts, preferences, client details (0.85)
+3. **Procedural** — learned SOPs with version chaining (0.9)
+4. **Relational** — bidirectional relationship graph (0.75)
+5. **Predictive** — pattern-based forecasting (0.7)
+
+### Memory Intelligence
+- IQ Scoring: weighted formula (Client Knowledge 25%, Process Mastery 25%, Relational Intel 20%, Predictive Accuracy 20%, Error Learning 10%)
+- IQ Levels: Apprentice (0-39) → Practitioner (40-59) → Expert (60-74) → Master (75-89) → Genius (90+)
+- Daily Memory Report: Claude-generated summary, new memories, connections discovered, flagged items
+- Connection analysis via Claude API
+- Demo memories seeded on startup
+- Live IQ + memory stats in dashboard (falls back to mock when offline)
+
+### API Routes Added
+- `POST /api/auth/demo` — demo login
+- `GET /api/auth/me` — verify token
+- `GET /api/auth/providers` — OAuth URLs
+- `POST /api/memory` — store memory (any layer)
+- `GET /api/memory` — query memories (filterable by type, agent, confidence)
+- `GET /api/memory/stats` — memory health stats
+- `GET /api/memory/report` — daily intelligence report
+- `GET /api/iq` — current IQ score
+
+**Phase 4 — Next: Browser Agent + Voice Layer + Integration Hub**
 
 ## Rules for Claude Code Sessions
 - Always read this CLAUDE.md first

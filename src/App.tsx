@@ -82,7 +82,7 @@ function App() {
       </main>
 
       {/* Right Panel */}
-      <MemoryPanel />
+      <MemoryPanel isConnected={isConnected} />
     </div>
   );
 }

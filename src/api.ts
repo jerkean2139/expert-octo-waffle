@@ -64,6 +64,101 @@ export async function updateTaskStatus(id: string, status: string): Promise<Serv
   return res.json();
 }
 
+// ============================================================
+// MEMORY ENGINE
+// ============================================================
+
+export interface ServerMemory {
+  id: string;
+  type: 'episodic' | 'semantic' | 'procedural' | 'relational' | 'predictive';
+  content: string;
+  confidence: number;
+  connections: { memoryId: string; relationship: string; strength: number }[];
+  createdAt: string;
+}
+
+export interface MemoryStats {
+  totalMemories: number;
+  confidenceAvg: number;
+  connectionCount: number;
+  predictiveTriggers: number;
+  byType: Record<string, number>;
+}
+
+export interface IQScore {
+  clientKnowledge: number;
+  processMastery: number;
+  relationalIntel: number;
+  predictiveAccuracy: number;
+  errorLearning: number;
+  totalScore: number;
+  level: string;
+  delta: number;
+}
+
+export interface MemoryReport {
+  reportDate: string;
+  newMemories: { id: string; content: string; type: string }[];
+  connectionsMade: { from: string; to: string; relationship: string }[];
+  flaggedReview: { id: string; content: string; reason: string }[];
+  stats: MemoryStats;
+  iqScore: IQScore;
+  summary: string;
+}
+
+export async function fetchMemories(type?: string): Promise<ServerMemory[]> {
+  const params = type ? `?type=${type}` : '';
+  const res = await fetch(`${API_BASE}/api/memory${params}`);
+  if (!res.ok) throw new Error('Failed to fetch memories');
+  return res.json();
+}
+
+export async function fetchMemoryStats(): Promise<MemoryStats> {
+  const res = await fetch(`${API_BASE}/api/memory/stats`);
+  if (!res.ok) throw new Error('Failed to fetch memory stats');
+  return res.json();
+}
+
+export async function fetchIQScore(): Promise<IQScore> {
+  const res = await fetch(`${API_BASE}/api/iq`);
+  if (!res.ok) throw new Error('Failed to fetch IQ score');
+  return res.json();
+}
+
+export async function fetchMemoryReport(): Promise<MemoryReport> {
+  const res = await fetch(`${API_BASE}/api/memory/report`);
+  if (!res.ok) throw new Error('Failed to fetch memory report');
+  return res.json();
+}
+
+export async function storeMemory(type: string, content: string, metadata?: Record<string, unknown>): Promise<ServerMemory> {
+  const res = await fetch(`${API_BASE}/api/memory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, content, metadata }),
+  });
+  if (!res.ok) throw new Error('Failed to store memory');
+  return res.json();
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+
+export async function demoLogin(role?: string): Promise<{ token: string; user: Record<string, string> }> {
+  const res = await fetch(`${API_BASE}/api/auth/demo`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) throw new Error('Login failed');
+  return res.json();
+}
+
+// ============================================================
+// SSE
+// ============================================================
+
 export function subscribeToEvents(onEvent: (event: TaskEvent) => void): () => void {
   const source = new EventSource(`${API_BASE}/api/events`);
 

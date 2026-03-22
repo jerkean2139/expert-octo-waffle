@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { memories, iqMetrics } from '../data/mockData';
+import { fetchMemories, fetchMemoryStats, fetchIQScore, type ServerMemory, type MemoryStats, type IQScore } from '../api';
+import { memories as mockMemories, iqMetrics as mockIqMetrics } from '../data/mockData';
 
 const memTypeConfig = {
   new: { label: 'New Memories (Yesterday)', className: 'text-cyan', itemClass: 'border-l-cyan bg-[var(--cyan-dim)]' },
@@ -10,12 +11,50 @@ const memTypeConfig = {
 
 const tabs = ['Memory', 'IQ Score', 'Log'] as const;
 
-export default function MemoryPanel() {
-  const [activeTab, setActiveTab] = useState<typeof tabs[number]>('Memory');
+interface MemoryPanelProps {
+  isConnected?: boolean;
+}
 
-  const newMems = memories.filter(m => m.type === 'new');
-  const connections = memories.filter(m => m.type === 'connection');
-  const flagged = memories.filter(m => m.type === 'flagged');
+export default function MemoryPanel({ isConnected = false }: MemoryPanelProps) {
+  const [activeTab, setActiveTab] = useState<typeof tabs[number]>('Memory');
+  const [liveMemories, setLiveMemories] = useState<ServerMemory[]>([]);
+  const [liveStats, setLiveStats] = useState<MemoryStats | null>(null);
+  const [liveIQ, setLiveIQ] = useState<IQScore | null>(null);
+
+  useEffect(() => {
+    if (!isConnected) return;
+    fetchMemories().then(setLiveMemories).catch(() => {});
+    fetchMemoryStats().then(setLiveStats).catch(() => {});
+    fetchIQScore().then(setLiveIQ).catch(() => {});
+  }, [isConnected]);
+
+  // Map live memories into display groups
+  const newMems = isConnected
+    ? liveMemories.filter(m => m.type === 'episodic' || m.type === 'semantic').slice(0, 5)
+    : mockMemories.filter(m => m.type === 'new');
+  const connectionMems = isConnected
+    ? liveMemories.filter(m => m.type === 'relational').slice(0, 5)
+    : mockMemories.filter(m => m.type === 'connection');
+  const flaggedMems = isConnected
+    ? liveMemories.filter(m => m.confidence < 0.75).slice(0, 5)
+    : mockMemories.filter(m => m.type === 'flagged');
+
+  // IQ data
+  const iqScore = liveIQ?.totalScore ?? 84;
+  const iqLevel = liveIQ?.level ?? 'Master';
+  const iqDelta = liveIQ?.delta ?? 3;
+  const iqMetrics = liveIQ
+    ? [
+      { label: 'Client Knowledge', value: liveIQ.clientKnowledge },
+      { label: 'Process Mastery', value: liveIQ.processMastery },
+      { label: 'Relational Intel', value: liveIQ.relationalIntel, color: '#00D4FF' },
+      { label: 'Predictive Accuracy', value: liveIQ.predictiveAccuracy, color: '#FFD93D' },
+      { label: 'Error Learning', value: liveIQ.errorLearning },
+    ]
+    : mockIqMetrics;
+
+  // Stats
+  const stats = liveStats ?? { totalMemories: 1247, confidenceAvg: 87, connectionCount: 43, predictiveTriggers: 7 };
 
   return (
     <aside className="w-[320px] bg-bg-surface-1 border-l border-border-default flex flex-col overflow-hidden shrink-0">
@@ -41,15 +80,17 @@ export default function MemoryPanel() {
             <div>
               <motion.div
                 className="font-display text-[32px] font-bold text-mint leading-none"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                key={iqScore}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
               >
-                84
+                {iqScore}
               </motion.div>
-              <div className="font-body text-[10px] text-mint tracking-wide uppercase">Master Level</div>
+              <div className="font-body text-[10px] text-mint tracking-wide uppercase">{iqLevel} Level</div>
             </div>
             <div className="font-body text-[10px] text-text-muted text-right">
-              ↑ +3 this week<br />
+              {iqDelta > 0 ? '↑' : iqDelta < 0 ? '↓' : '→'} {iqDelta > 0 ? '+' : ''}{iqDelta} this week<br />
               <span className="text-text-muted">Next test Mar 28</span>
             </div>
           </div>
@@ -85,7 +126,7 @@ export default function MemoryPanel() {
             </div>
             {newMems.map((mem, i) => (
               <div key={i} className={`font-body text-[10px] text-text-secondary px-2 py-1.5 border-l-2 mb-1 leading-relaxed ${memTypeConfig.new.itemClass}`}>
-                {mem.text}
+                {'text' in mem ? mem.text : mem.content}
               </div>
             ))}
           </div>
@@ -95,9 +136,9 @@ export default function MemoryPanel() {
             <div className={`font-body text-[9px] tracking-wider uppercase mb-1.5 flex items-center gap-1.5 ${memTypeConfig.connection.className}`}>
               Connections Made
             </div>
-            {connections.map((mem, i) => (
+            {connectionMems.map((mem, i) => (
               <div key={i} className={`font-body text-[10px] text-text-secondary px-2 py-1.5 border-l-2 mb-1 leading-relaxed ${memTypeConfig.connection.itemClass}`}>
-                {mem.text}
+                {'text' in mem ? mem.text : mem.content}
               </div>
             ))}
           </div>
@@ -107,9 +148,9 @@ export default function MemoryPanel() {
             <div className={`font-body text-[9px] tracking-wider uppercase mb-1.5 flex items-center gap-1.5 ${memTypeConfig.flagged.className}`}>
               Flagged for Review
             </div>
-            {flagged.map((mem, i) => (
+            {flaggedMems.map((mem, i) => (
               <div key={i} className={`font-body text-[10px] text-text-secondary px-2 py-1.5 border-l-2 mb-1 leading-relaxed ${memTypeConfig.flagged.itemClass}`}>
-                {mem.text}
+                {'text' in mem ? mem.text : mem.content}
               </div>
             ))}
           </div>
@@ -121,10 +162,10 @@ export default function MemoryPanel() {
             Memory Health
           </div>
           {[
-            { label: 'Total Memories', value: '1,247', color: '' },
-            { label: 'Confidence Avg', value: '87%', color: 'text-mint' },
-            { label: 'Connections Mapped', value: '43', color: '' },
-            { label: 'Predictive Triggers', value: '7 active', color: 'text-violet' },
+            { label: 'Total Memories', value: stats.totalMemories.toLocaleString(), color: '' },
+            { label: 'Confidence Avg', value: `${stats.confidenceAvg}%`, color: 'text-mint' },
+            { label: 'Connections Mapped', value: String(stats.connectionCount), color: '' },
+            { label: 'Predictive Triggers', value: `${stats.predictiveTriggers} active`, color: 'text-violet' },
             { label: 'Memory Scope', value: 'VybeKoderz', color: '' },
           ].map((stat, i, arr) => (
             <div
