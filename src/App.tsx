@@ -8,6 +8,8 @@ import VoiceBar from './components/VoiceBar';
 import MemoryPanel from './components/MemoryPanel';
 import TaskInput from './components/TaskInput';
 import RoutingAnimation from './components/RoutingAnimation';
+import BrowserMonitor from './components/BrowserMonitor';
+import IntegrationStatus from './components/IntegrationStatus';
 import { useTaskStore } from './hooks/useTaskStore';
 import { tasks as mockTasks } from './data/mockData';
 
@@ -58,23 +60,25 @@ function App() {
               </div>
             </div>
 
-            {/* Live tasks from backend */}
-            {showLive && (
-              <div className="grid grid-cols-2 gap-3 mb-3">
+            {showLive ? (
+              <div className="grid grid-cols-2 gap-3">
                 {liveTasks.map((task, i) => (
                   <LiveTaskCard key={task.id} task={task} index={i} />
                 ))}
               </div>
-            )}
-
-            {/* Mock tasks (always shown as demo) */}
-            {!showLive && (
+            ) : (
               <div className="grid grid-cols-2 gap-3">
                 {mockTasks.map((task, i) => (
                   <TaskCard key={task.id} task={task} index={i} />
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Browser Agent + Integrations row */}
+          <div className="grid grid-cols-2 gap-3">
+            <BrowserMonitor />
+            <IntegrationStatus />
           </div>
         </div>
 

@@ -202,6 +202,183 @@ app.get('/api/memory/report', async (_req, res) => {
 });
 
 // ============================================================
+// BROWSER AGENT
+// ============================================================
+
+import {
+  createSOP, getSOP, getAllSOPs,
+  createSession, getSession, getAllSessions, executeSOP as executeSOPFn,
+  captureOverrideStep, learnFromOverride, seedDemoSOPs, onSessionUpdate,
+} from './browser/sopExecutor';
+
+// Seed demo SOPs
+seedDemoSOPs(DEMO_TENANT);
+
+// Broadcast browser session updates via SSE
+onSessionUpdate((session) => {
+  const data = JSON.stringify({ type: 'browser_update', session });
+  for (const client of sseClients) {
+    client.write(`data: ${data}\n\n`);
+  }
+});
+
+// SOP routes
+app.get('/api/sops', (_req, res) => {
+  res.json(getAllSOPs(DEMO_TENANT));
+});
+
+app.get('/api/sops/:id', (req, res) => {
+  const sop = getSOP(req.params.id);
+  if (!sop) return res.status(404).json({ error: 'SOP not found' });
+  res.json(sop);
+});
+
+app.post('/api/sops', (req, res) => {
+  const { name, description, agentId, steps } = req.body;
+  if (!name || !steps?.length) {
+    return res.status(400).json({ error: 'Missing name or steps' });
+  }
+  const sop = createSOP({ tenantId: DEMO_TENANT, name, description, agentId: agentId || 'sop-executor', steps });
+  res.status(201).json(sop);
+});
+
+// Browser session routes
+app.get('/api/browser/sessions', (_req, res) => {
+  res.json(getAllSessions(DEMO_TENANT));
+});
+
+app.get('/api/browser/sessions/:id', (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(session);
+});
+
+app.post('/api/browser/sessions', (req, res) => {
+  const { taskId, agentId, sopId } = req.body;
+  const session = createSession({ tenantId: DEMO_TENANT, taskId, agentId: agentId || 'browser-agent', sopId });
+  res.status(201).json(session);
+});
+
+app.post('/api/browser/sessions/:id/execute', async (req, res) => {
+  try {
+    const session = await executeSOPFn(req.params.id);
+    res.json(session);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/browser/sessions/:id/override', (req, res) => {
+  const { step } = req.body;
+  if (!step) return res.status(400).json({ error: 'Missing step' });
+  captureOverrideStep(req.params.id, step);
+  res.json({ success: true });
+});
+
+app.post('/api/browser/sessions/:id/learn', (req, res) => {
+  const sop = learnFromOverride(req.params.id, DEMO_TENANT);
+  if (!sop) return res.status(404).json({ error: 'No override steps to learn from' });
+  res.json(sop);
+});
+
+// ============================================================
+// VOICE LAYER
+// ============================================================
+
+import {
+  createVoiceSession, getVoiceSession,
+  transcribeAudio, synthesizeSpeech, extractMeetingActions,
+} from './voice/voiceService';
+
+app.post('/api/voice/sessions', (_req, res) => {
+  const session = createVoiceSession(DEMO_TENANT);
+  res.status(201).json(session);
+});
+
+app.get('/api/voice/sessions/:id', (req, res) => {
+  const session = getVoiceSession(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(session);
+});
+
+app.post('/api/voice/sessions/:id/transcribe', async (req, res) => {
+  try {
+    // In production: parse multipart audio buffer
+    const audioBuffer = Buffer.from('simulated-audio');
+    const entry = await transcribeAudio(req.params.id, audioBuffer);
+    res.json(entry);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/voice/sessions/:id/speak', async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Missing text' });
+  try {
+    const entry = await synthesizeSpeech(req.params.id, text);
+    res.json(entry);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/voice/meeting-actions', async (req, res) => {
+  const { transcript } = req.body;
+  if (!transcript) return res.status(400).json({ error: 'Missing transcript' });
+  const actions = await extractMeetingActions(transcript);
+  res.json(actions);
+});
+
+// ============================================================
+// INTEGRATION HUB
+// ============================================================
+
+import {
+  getAllIntegrations, getIntegration, getByCategory, getConnected,
+  connectIntegration, disconnectIntegration, healthCheck, getHubStats,
+} from './integrations/hub';
+
+app.get('/api/integrations', (req, res) => {
+  const { category } = req.query;
+  if (category) {
+    res.json(getByCategory(category as Parameters<typeof getByCategory>[0]));
+  } else {
+    res.json(getAllIntegrations());
+  }
+});
+
+app.get('/api/integrations/stats', (_req, res) => {
+  res.json(getHubStats());
+});
+
+app.get('/api/integrations/connected', (_req, res) => {
+  res.json(getConnected());
+});
+
+app.get('/api/integrations/:id', (req, res) => {
+  const integration = getIntegration(req.params.id);
+  if (!integration) return res.status(404).json({ error: 'Integration not found' });
+  res.json(integration);
+});
+
+app.post('/api/integrations/:id/connect', (req, res) => {
+  const result = connectIntegration(req.params.id, req.body.config);
+  if (!result) return res.status(404).json({ error: 'Integration not found' });
+  res.json(result);
+});
+
+app.post('/api/integrations/:id/disconnect', (req, res) => {
+  const result = disconnectIntegration(req.params.id);
+  if (!result) return res.status(404).json({ error: 'Integration not found' });
+  res.json(result);
+});
+
+app.get('/api/integrations/:id/health', (req, res) => {
+  res.json(healthCheck(req.params.id));
+});
+
+// ============================================================
 // START
 // ============================================================
 
@@ -210,4 +387,6 @@ app.listen(PORT, () => {
   console.log(`  Demo tenant: ${DEMO_TENANT}`);
   console.log(`  Memory engine: ${getMemoryStats(DEMO_TENANT).totalMemories} memories seeded`);
   console.log(`  IQ Score: ${calculateIQScore(DEMO_TENANT).totalScore} (${calculateIQScore(DEMO_TENANT).level})`);
+  console.log(`  SOPs: ${getAllSOPs(DEMO_TENANT).length} demo SOPs loaded`);
+  console.log(`  Integrations: ${getHubStats().total} configured, ${getHubStats().connected} connected`);
 });

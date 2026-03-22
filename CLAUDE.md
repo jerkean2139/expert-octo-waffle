@@ -252,7 +252,48 @@ Wired real Claude API integration and agent routing:
 - `GET /api/memory/report` — daily intelligence report
 - `GET /api/iq` — current IQ score
 
-**Phase 4 — Next: Browser Agent + Voice Layer + Integration Hub**
+**Phase 4 — Browser Agent + Voice Layer + Integration Hub** (COMPLETE)
+
+### Browser Agent Layer (`server/browser/`)
+- SOP Definition system: typed steps (navigate, click, type, wait, screenshot, extract, scroll, select, assert)
+- SOP Executor: simulated Playwright execution with step logging + progress tracking
+- Browser session management with Browserbase session IDs
+- Screenshot capture at key steps
+- Human Override → Co-Pilot Learning: capture human actions → offer to save as new SOP
+- `learnFromOverride()`: auto-generates new SOP from human takeover session
+- Demo SOPs: Empire Title Weekly Report (9 steps), GHL Contact Onboarding (7 steps)
+- SSE broadcast of browser session updates to frontend
+
+### Voice Layer (`server/voice/`)
+- OpenAI Whisper API integration for speech-to-text (STT)
+- ElevenLabs API integration for text-to-speech (TTS)
+- Voice session management with transcript history
+- Meeting Intelligence: extract actions, decisions, follow-ups from meeting transcripts
+- Modes: push-to-talk, voice walkthrough, meeting assistant
+
+### Integration Hub (`server/integrations/`)
+- 18 integrations registered across 6 categories:
+  - Google (5): Gmail, Calendar, Drive, Sheets, Meet
+  - Microsoft (4): Outlook, Teams, OneDrive, SharePoint
+  - CRM (3): GoHighLevel, Stripe, HubSpot
+  - PM (3): Asana, Notion, ClickUp
+  - Communication (1): Slack
+  - Automation (2): Zapier, Make
+- MCP endpoint configuration per integration
+- Connect/disconnect/health-check API
+- Hub stats dashboard
+
+### Frontend Components
+- `BrowserMonitor`: live SOP execution viewer with step-by-step log, progress bar, Take Control button
+- `IntegrationStatus`: 5x2 grid showing all integrations with connected/disconnected states
+
+### API Routes Added
+- SOPs: `GET/POST /api/sops`, `GET /api/sops/:id`
+- Browser: `GET/POST /api/browser/sessions`, `POST .../execute`, `POST .../override`, `POST .../learn`
+- Voice: `POST /api/voice/sessions`, `POST .../transcribe`, `POST .../speak`, `POST /api/voice/meeting-actions`
+- Integrations: `GET /api/integrations`, `GET .../stats`, `GET .../connected`, `POST .../:id/connect`, `POST .../:id/disconnect`, `GET .../:id/health`
+
+**Phase 5 — Next: Production deployment, real integrations, multi-tenant UI**
 
 ## Rules for Claude Code Sessions
 - Always read this CLAUDE.md first
