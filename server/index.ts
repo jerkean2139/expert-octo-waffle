@@ -49,6 +49,11 @@ const PORT = process.env.PORT || 3001;
 const DEMO_TENANT = 'vybekoderz-demo';
 const DEMO_PLAN: PlanTier = 'enterprise';
 
+// Prevent unhandled rejections from crashing the server
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] Unhandled rejection:', reason);
+});
+
 // ============================================================
 // MIDDLEWARE
 // ============================================================
@@ -1048,9 +1053,17 @@ subscribe((event) => {
 // Initialize job queue in background — never blocks server startup
 initJobQueue().then(async (boss) => {
   if (boss) {
-    await registerWorkers(boss);
-    await registerAutonomyJobs(boss);
-    console.log('  Job queue: pg-boss workers registered');
+    try {
+      await registerWorkers(boss);
+    } catch (err) {
+      console.error('  Job queue: worker registration failed —', (err as Error).message);
+    }
+    try {
+      await registerAutonomyJobs(boss);
+    } catch (err) {
+      console.error('  Job queue: autonomy jobs failed —', (err as Error).message);
+    }
+    console.log('  Job queue: pg-boss initialized');
   } else {
     console.log('  Job queue: in-memory fallback');
   }
