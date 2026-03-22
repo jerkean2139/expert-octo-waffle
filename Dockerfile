@@ -25,5 +25,5 @@ EXPOSE 3001
 RUN mkdir -p /data/artifacts
 ENV STORAGE_PATH=/data/artifacts
 
-# Start server (migrations run if DATABASE_URL + drizzle dir present)
-CMD ["sh", "-c", "npx tsx server/index.ts"]
+# Start server
+CMD ["npx", "tsx", "server/index.ts"]
