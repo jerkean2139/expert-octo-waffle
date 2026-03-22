@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { routeTask } from './donna';
 import { createTask, routeTaskToAgent, getAllTasks, getTask, updateTaskStatus, subscribe } from './taskStore';
 import { agents } from './agents';
@@ -20,6 +21,10 @@ const DEMO_TENANT = 'vybekoderz-demo';
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static frontend in production
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
 
 // Seed demo memories on startup
 seedDemoMemories(DEMO_TENANT);
@@ -376,6 +381,14 @@ app.post('/api/integrations/:id/disconnect', (req, res) => {
 
 app.get('/api/integrations/:id/health', (req, res) => {
   res.json(healthCheck(req.params.id));
+});
+
+// ============================================================
+// SPA FALLBACK — serve index.html for all non-API routes
+// ============================================================
+
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
 });
 
 // ============================================================

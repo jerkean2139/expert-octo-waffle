@@ -293,7 +293,54 @@ Wired real Claude API integration and agent routing:
 - Voice: `POST /api/voice/sessions`, `POST .../transcribe`, `POST .../speak`, `POST /api/voice/meeting-actions`
 - Integrations: `GET /api/integrations`, `GET .../stats`, `GET .../connected`, `POST .../:id/connect`, `POST .../:id/disconnect`, `GET .../:id/health`
 
-**Phase 5 — Next: Production deployment, real integrations, multi-tenant UI**
+**Phase 5 — Production Deployment, Multi-Tenant UI, Portal Routes** (COMPLETE)
+
+### React Router + Portal Navigation
+- React Router v7 with `BrowserRouter`
+- Routes: `/` (Dashboard), `/sops` (SOP Library), `/integrations` (Integration Hub), `/admin` (Admin Panel)
+- SPA fallback in Express server for production
+- LeftRail updated with route-aware navigation + active state highlighting
+
+### Auth Flow + Login Page
+- `AuthProvider` context with JWT token management
+- Login page with Google/Microsoft OAuth buttons + demo role selector
+- 5-tier role selector: Super Admin, Agency Admin, Project Lead, Builder, Client Viewer
+- Token persistence via localStorage
+- Graceful fallback when backend is offline (demo mode)
+- Protected layout: redirects to login when unauthenticated
+
+### Multi-Tenant Admin Panel (`/admin`)
+- Tabs: Tenants (super admin only), Team, Settings
+- Tenant management: plan tiers, user counts, agent counts, task stats
+- Team management: member list, role badges, invite system, remove users
+- Workspace settings: custom name, Donna name, brand color, custom domain
+
+### SOP Library Page (`/sops`)
+- Full SOP list with expandable step details
+- Stats row: total SOPs, active, drafts, executions today
+- Status badges (active/draft/disabled)
+- Create new SOP button, Run SOP button per item
+
+### Integration Management Page (`/integrations`)
+- 18 integrations organized by category (Google, Microsoft, CRM, PM, Automation, Communication)
+- Connect/disconnect state per integration
+- Stats: total, connected, available
+- Category-grouped grid layout
+
+### Production Deployment
+- Dockerfile: multi-stage build (Node 20 Alpine)
+- Railway config (`railway.toml`): Dockerfile builder, health check, restart policy
+- Express serves static frontend from `dist/` in production
+- SPA fallback route for client-side routing
+
+### Pages Added
+- `src/pages/LoginPage.tsx` — OAuth + demo login
+- `src/pages/DashboardPage.tsx` — Mission Control (extracted from App)
+- `src/pages/SOPLibraryPage.tsx` — SOP management
+- `src/pages/IntegrationsPage.tsx` — Integration hub detail view
+- `src/pages/AdminPage.tsx` — Tenant & team management
+
+**Phase 6 — Next: Real database persistence, live OAuth flows, Browserbase integration, production deploy to Railway**
 
 ## Rules for Claude Code Sessions
 - Always read this CLAUDE.md first
