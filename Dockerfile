@@ -20,5 +20,9 @@ COPY --from=builder /app/tsconfig.node.json ./tsconfig.node.json
 
 EXPOSE 3001
 
+# Create artifact storage directory (Railway Volume mounts here)
+RUN mkdir -p /data/artifacts
+ENV STORAGE_PATH=/data/artifacts
+
 # Run migrations then start server
 CMD ["sh", "-c", "npx tsx server/db/migrate.ts && npx tsx server/index.ts"]

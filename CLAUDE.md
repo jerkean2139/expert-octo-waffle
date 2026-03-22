@@ -56,9 +56,9 @@ This is not a chatbot. It is a **living AI organization** — agents that delega
 - Legacy 5-layer types accepted via `normalizeLegacyType()` for backward compat
 
 ### Storage
-- S3/R2-compatible artifact storage for task outputs (reports, CSVs, screenshots)
-- Presigned URLs for secure downloads
-- Falls back to metadata-only when no S3 config
+- Railway Volume for artifact storage (task outputs: reports, CSVs, screenshots)
+- Mount path: `STORAGE_PATH` env var (default: `/data/artifacts`)
+- Direct file serving via Express — no external storage service needed
 
 ### Billing
 - Plan tiers: starter (100 tasks/mo), pro (1000), enterprise (unlimited)
@@ -194,7 +194,7 @@ Right: Context inspector — memory report, IQ score, quick log
 - **Integrations** — 18 MCP-connected services across 6 categories
 - **Job Queue** — pg-boss for reliable task processing with retry
 - **Notifications** — Real-time activity feed via SSE
-- **Artifacts** — S3/R2 storage for task outputs (reports, CSVs, screenshots)
+- **Artifacts** — Railway Volume storage for task outputs (reports, CSVs, screenshots)
 - **Billing** — Plan limits enforcement (starter/pro/enterprise)
 - **Security** — Rate limiting, OAuth CSRF nonces, role-guarded routes
 - **Mobile** — Responsive layout with collapsible panels
@@ -215,7 +215,7 @@ Right: Context inspector — memory report, IQ score, quick log
 **Integrations**: GET `/api/integrations`, GET `.../stats`, `.../connected`, POST `.../:id/connect`, `.../:id/disconnect`
 **Webhooks**: POST `/api/webhooks/:source`
 **Notifications**: GET `/api/notifications`, GET `.../count`, POST `.../:id/read`, POST `.../read-all`
-**Artifacts**: GET/POST `/api/artifacts`, GET/DELETE `/api/artifacts/:id`, GET `.../url`
+**Artifacts**: GET/POST `/api/artifacts`, GET/DELETE `/api/artifacts/:id`, GET `.../download`
 **Billing**: GET `/api/billing/usage`, GET `/api/billing/limits`
 **SSE**: GET `/api/events`
 

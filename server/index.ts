@@ -21,7 +21,7 @@ import {
   getNotifications, addNotification, markRead, markAllRead, getUnreadCount, onNotification,
 } from './notifications/feed';
 import {
-  uploadArtifact, getArtifact, getArtifactUrl, getArtifactsByTask,
+  uploadArtifact, getArtifact, getArtifactPath, getArtifactsByTask,
   getArtifactsByTenant, deleteArtifact, isStorageConfigured,
 } from './storage/artifacts';
 import {
@@ -804,10 +804,12 @@ app.get('/api/artifacts/:id', (req, res) => {
   res.json(artifact);
 });
 
-app.get('/api/artifacts/:id/url', async (req, res) => {
-  const url = await getArtifactUrl(req.params.id);
-  if (!url) return res.status(404).json({ error: 'Artifact not found or storage not configured' });
-  res.json({ url });
+app.get('/api/artifacts/:id/download', (req, res) => {
+  const file = getArtifactPath(req.params.id);
+  if (!file) return res.status(404).json({ error: 'Artifact not found' });
+  res.setHeader('Content-Type', file.contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+  res.sendFile(file.filePath);
 });
 
 app.delete('/api/artifacts/:id', async (req, res) => {

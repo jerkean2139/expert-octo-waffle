@@ -1,15 +1,13 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuid } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 // ============================================================
-// Artifact Storage — S3/R2 for task outputs
+// Artifact Storage — Railway Volume (local disk)
 //
 // Agents produce files: reports, CSVs, screenshots, emails.
-// This module stores them and returns presigned URLs.
-//
-// Supports: AWS S3, Cloudflare R2, MinIO, any S3-compatible store.
-// Falls back to local filesystem when no S3 config.
+// Stored on a Railway Volume mounted at STORAGE_PATH (default: /data/artifacts).
+// Served directly via Express — no S3 needed.
 // ============================================================
 
 export interface Artifact {
@@ -19,46 +17,35 @@ export interface Artifact {
   filename: string;
   contentType: string;
   size: number;
-  storageKey: string;
-  url: string | null;       // presigned URL (temporary)
+  storagePath: string;       // absolute path on disk
   createdAt: string;
 }
 
-// S3 client (lazy init)
-let s3Client: S3Client | null = null;
+// Storage root — Railway Volume mount point or local fallback
+const STORAGE_ROOT = process.env.STORAGE_PATH || path.join(process.cwd(), 'data', 'artifacts');
 
-function getS3(): S3Client | null {
-  if (s3Client) return s3Client;
-
-  const endpoint = process.env.S3_ENDPOINT;
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY;
-  const region = process.env.S3_REGION || process.env.AWS_REGION || 'auto';
-
-  if (!accessKeyId || !secretAccessKey) return null;
-
-  s3Client = new S3Client({
-    region,
-    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
-    credentials: { accessKeyId, secretAccessKey },
-  });
-
-  return s3Client;
+function ensureDir(dir: string) {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 }
 
-function getBucket(): string {
-  return process.env.S3_BUCKET || 'vybeos-artifacts';
-}
+// Initialize storage directory on import
+ensureDir(STORAGE_ROOT);
 
 export function isStorageConfigured(): boolean {
-  return getS3() !== null;
+  return true; // Always configured — local disk is always available
 }
 
-// In-memory artifact registry (metadata only)
+export function getStorageRoot(): string {
+  return STORAGE_ROOT;
+}
+
+// In-memory artifact registry (metadata)
 const artifacts: Map<string, Artifact> = new Map();
 
 // ============================================================
-// Upload
+// Upload — write to disk
 // ============================================================
 
 export async function uploadArtifact(params: {
@@ -69,56 +56,50 @@ export async function uploadArtifact(params: {
   data: Buffer;
 }): Promise<Artifact> {
   const id = uuid();
-  const storageKey = `${params.tenantId}/${id}/${params.filename}`;
+
+  // Tenant-scoped directory: /data/artifacts/<tenantId>/<artifactId>/
+  const artifactDir = path.join(STORAGE_ROOT, params.tenantId, id);
+  ensureDir(artifactDir);
+
+  // Sanitize filename — strip path separators to prevent traversal
+  const safeName = path.basename(params.filename);
+  const filePath = path.join(artifactDir, safeName);
+
+  // Write file to disk
+  await fs.promises.writeFile(filePath, params.data);
 
   const artifact: Artifact = {
     id,
     tenantId: params.tenantId,
     taskId: params.taskId ?? null,
-    filename: params.filename,
+    filename: safeName,
     contentType: params.contentType,
     size: params.data.length,
-    storageKey,
-    url: null,
+    storagePath: filePath,
     createdAt: new Date().toISOString(),
   };
-
-  const client = getS3();
-  if (client) {
-    await client.send(new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: storageKey,
-      Body: params.data,
-      ContentType: params.contentType,
-    }));
-  }
-  // If no S3, artifact metadata is still tracked but data is not persisted
 
   artifacts.set(id, artifact);
   return artifact;
 }
 
 // ============================================================
-// Get presigned download URL
+// Download — stream from disk
 // ============================================================
 
-export async function getArtifactUrl(id: string): Promise<string | null> {
+export function getArtifactPath(id: string): { filePath: string; contentType: string; filename: string } | null {
   const artifact = artifacts.get(id);
   if (!artifact) return null;
-
-  const client = getS3();
-  if (!client) return null;
-
-  const url = await getSignedUrl(client, new GetObjectCommand({
-    Bucket: getBucket(),
-    Key: artifact.storageKey,
-  }), { expiresIn: 3600 }); // 1 hour
-
-  return url;
+  if (!fs.existsSync(artifact.storagePath)) return null;
+  return {
+    filePath: artifact.storagePath,
+    contentType: artifact.contentType,
+    filename: artifact.filename,
+  };
 }
 
 // ============================================================
-// Get artifact metadata
+// Metadata
 // ============================================================
 
 export function getArtifact(id: string): Artifact | undefined {
@@ -136,19 +117,27 @@ export function getArtifactsByTenant(tenantId: string): Artifact[] {
 }
 
 // ============================================================
-// Delete
+// Delete — remove from disk + registry
 // ============================================================
 
 export async function deleteArtifact(id: string): Promise<boolean> {
   const artifact = artifacts.get(id);
   if (!artifact) return false;
 
-  const client = getS3();
-  if (client) {
-    await client.send(new DeleteObjectCommand({
-      Bucket: getBucket(),
-      Key: artifact.storageKey,
-    }));
+  // Remove file from disk
+  if (fs.existsSync(artifact.storagePath)) {
+    await fs.promises.unlink(artifact.storagePath);
+  }
+
+  // Clean up empty parent directory
+  const parentDir = path.dirname(artifact.storagePath);
+  try {
+    const remaining = await fs.promises.readdir(parentDir);
+    if (remaining.length === 0) {
+      await fs.promises.rmdir(parentDir);
+    }
+  } catch {
+    // Directory cleanup is best-effort
   }
 
   artifacts.delete(id);
