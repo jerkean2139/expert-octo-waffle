@@ -3,11 +3,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npx tsx server/index.ts"
 healthcheckPath = "/api/agents"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-
-[[services]]
-name = "vybekoderz-agent-os"

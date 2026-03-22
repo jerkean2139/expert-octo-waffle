@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Globe, Play, Pause, Eye, Camera } from 'lucide-react';
+import { Globe, Pause, Eye, Camera } from 'lucide-react';
 
 interface BrowserStep {
   action: string;
