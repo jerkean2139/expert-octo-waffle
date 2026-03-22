@@ -1,7 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { routeTask } from './donna';
 import { createTask, routeTaskToAgent, getAllTasks, getTask, updateTaskStatus, subscribe } from './taskStore';
 import { agents } from './agents';
@@ -1010,7 +1014,7 @@ app.get('/api/metrics', (_req, res) => {
 // SPA FALLBACK — serve index.html for all non-API routes
 // ============================================================
 
-app.get('*', (_req, res) => {
+app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
