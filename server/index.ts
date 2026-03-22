@@ -22,6 +22,13 @@ import {
   runWeeklyAssessment, optimizeSOPs, detectSpecialistNeeds,
 } from './jobs/autonomy';
 import {
+  registerEventTriggers, onHumanOverride,
+  decomposeTask, getChildTaskIds, isParentTask, updateParentProgress,
+  getKillSwitch, manualKill, manualResume,
+  getAPIUsageStats, checkBudget, setDailyBudget,
+  getAgentInstincts, getGraduatedInsights, runGraduationSweep,
+} from './autonomy';
+import {
   getNotifications, addNotification, markRead, markAllRead, getUnreadCount, onNotification,
 } from './notifications/feed';
 import {
@@ -579,6 +586,113 @@ app.post('/api/autonomy/detect-specialists', async (_req, res) => {
   }
 });
 
+app.post('/api/autonomy/graduate', async (_req, res) => {
+  try {
+    const graduated = await runGraduationSweep(DEMO_TENANT);
+    res.json({ graduated });
+  } catch (error) {
+    res.status(500).json({ error: 'Graduation sweep failed' });
+  }
+});
+
+// ============================================================
+// KILL SWITCH — halt/resume autonomy
+// ============================================================
+
+app.get('/api/autonomy/kill-switch', (_req, res) => {
+  res.json(getKillSwitch(DEMO_TENANT));
+});
+
+app.post('/api/autonomy/kill', (req, res) => {
+  const { reason } = req.body ?? {};
+  res.json(manualKill(DEMO_TENANT, reason ?? 'Manual kill via API'));
+});
+
+app.post('/api/autonomy/resume', (_req, res) => {
+  res.json(manualResume(DEMO_TENANT));
+});
+
+// ============================================================
+// COST METERING — track Claude API spend
+// ============================================================
+
+app.get('/api/autonomy/cost', (_req, res) => {
+  res.json(getAPIUsageStats(DEMO_TENANT));
+});
+
+app.get('/api/autonomy/budget', (_req, res) => {
+  res.json(checkBudget(DEMO_TENANT));
+});
+
+app.patch('/api/autonomy/budget', (req, res) => {
+  const { dailyBudgetUsd } = req.body ?? {};
+  if (typeof dailyBudgetUsd !== 'number' || dailyBudgetUsd <= 0) {
+    return res.status(400).json({ error: 'dailyBudgetUsd must be a positive number' });
+  }
+  setDailyBudget(DEMO_TENANT, dailyBudgetUsd);
+  res.json(checkBudget(DEMO_TENANT));
+});
+
+// ============================================================
+// INSTINCTS — graduated insights & agent behavior
+// ============================================================
+
+app.get('/api/autonomy/instincts', (_req, res) => {
+  res.json(getGraduatedInsights(DEMO_TENANT));
+});
+
+app.get('/api/autonomy/instincts/:agentId', (req, res) => {
+  res.json({ agentId: req.params.agentId, instincts: getAgentInstincts(req.params.agentId) });
+});
+
+// ============================================================
+// TASK DECOMPOSITION — complex task splitting
+// ============================================================
+
+app.post('/api/tasks/decompose', async (req, res) => {
+  const { input } = req.body ?? {};
+  if (!input) return res.status(400).json({ error: 'input is required' });
+  try {
+    const result = await decomposeTask(input, DEMO_TENANT);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: 'Task decomposition failed' });
+  }
+});
+
+app.get('/api/tasks/:id/subtasks', (req, res) => {
+  const taskId = req.params.id;
+  if (!isParentTask(taskId)) {
+    return res.json({ isParent: false, subtasks: [] });
+  }
+  const childIds = getChildTaskIds(taskId);
+  const children = childIds.map(id => getTask(id)).filter(Boolean);
+  res.json({ isParent: true, subtasks: children });
+});
+
+// ============================================================
+// HUMAN OVERRIDE — real-time learning from corrections
+// ============================================================
+
+app.post('/api/override', async (req, res) => {
+  const { taskId, agentId, overrideType, humanAction } = req.body ?? {};
+  if (!taskId || !agentId || !overrideType || !humanAction) {
+    return res.status(400).json({ error: 'taskId, agentId, overrideType, and humanAction are required' });
+  }
+  try {
+    await onHumanOverride({
+      tenantId: DEMO_TENANT,
+      taskId,
+      agentId,
+      overrideType,
+      humanAction,
+    });
+    res.json({ learned: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Override learning failed' });
+  }
+});
+
 // ============================================================
 // BROWSER AGENT
 // ============================================================
@@ -912,6 +1026,16 @@ async function start() {
     await registerAutonomyJobs(boss);
   }
 
+  // Register event-driven autonomy triggers (runs without pg-boss)
+  registerEventTriggers();
+
+  // Track parent task progress when subtasks complete
+  subscribe((event) => {
+    if (event.type === 'task_completed' || event.type === 'task_error') {
+      updateParentProgress(event.task.id, event.task.status, getAllTasks);
+    }
+  });
+
   app.listen(PORT, () => {
     console.log(`VybeKoderz Agent OS server running on port ${PORT}`);
     console.log(`  Demo tenant: ${DEMO_TENANT}`);
@@ -921,6 +1045,8 @@ async function start() {
     console.log(`  Integrations: ${getHubStats().total} configured, ${getHubStats().connected} connected`);
     console.log(`  Rate limiting: active (100 req/min API, 20 req/min auth)`);
     console.log(`  Job queue: ${boss ? 'pg-boss active' : 'in-memory fallback'}`);
+    console.log(`  Event triggers: task_completed, task_error, override listeners`);
+    console.log(`  Kill switch: ${getKillSwitch(DEMO_TENANT).killed ? 'KILLED' : getKillSwitch(DEMO_TENANT).throttled ? 'THROTTLED' : 'active'}`);
     console.log(`  Storage: local disk (${isStorageConfigured() ? 'ready' : 'not configured'})`);
   });
 }

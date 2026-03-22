@@ -194,6 +194,11 @@ Right: Context inspector — memory report, IQ score, quick log
 - **Integrations** — 18 MCP-connected services across 6 categories
 - **Job Queue** — pg-boss for reliable task processing with retry
 - **Autonomy Engine** — 5 scheduled jobs (memory consolidation, daily report, weekly IQ, SOP optimization, specialist detection)
+- **Event Triggers** — Real-time reactions to task_completed, task_error, and human overrides
+- **Insight Graduation** — Confirmed patterns auto-promote to permanent agent instincts
+- **Task Decomposition** — Donna splits complex multi-dept tasks into parallel subtasks
+- **Cost Metering** — Per-tenant, per-job Claude API token tracking with daily budgets
+- **Kill Switch** — Auto-halt autonomy when health score drops critical, manual override
 - **Notifications** — Real-time activity feed via SSE
 - **Artifacts** — Railway Volume storage for task outputs (reports, CSVs, screenshots)
 - **Billing** — Plan limits enforcement (starter/pro/enterprise)
@@ -217,7 +222,12 @@ Right: Context inspector — memory report, IQ score, quick log
 **Webhooks**: POST `/api/webhooks/:source`
 **Notifications**: GET `/api/notifications`, GET `.../count`, POST `.../:id/read`, POST `.../read-all`
 **Artifacts**: GET/POST `/api/artifacts`, GET/DELETE `/api/artifacts/:id`, GET `.../download`
-**Autonomy**: POST `/api/autonomy/consolidate`, `.../report`, `.../assessment`, `.../optimize-sops`, `.../detect-specialists`
+**Autonomy**: POST `/api/autonomy/consolidate`, `.../report`, `.../assessment`, `.../optimize-sops`, `.../detect-specialists`, `.../graduate`
+**Kill Switch**: GET `/api/autonomy/kill-switch`, POST `.../kill`, POST `.../resume`
+**Cost Meter**: GET `/api/autonomy/cost`, GET/PATCH `/api/autonomy/budget`
+**Instincts**: GET `/api/autonomy/instincts`, GET `.../instincts/:agentId`
+**Decomposition**: POST `/api/tasks/decompose`, GET `/api/tasks/:id/subtasks`
+**Override**: POST `/api/override`
 **Billing**: GET `/api/billing/usage`, GET `/api/billing/limits`
 **SSE**: GET `/api/events`
 
