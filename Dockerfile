@@ -19,11 +19,10 @@ COPY --from=builder /app/tsconfig.node.json ./tsconfig.node.json
 # Copy drizzle migrations if they exist (generated via npm run db:generate)
 RUN mkdir -p ./drizzle
 
-EXPOSE 3001
-
 # Create artifact storage directory (Railway Volume mounts here)
 RUN mkdir -p /data/artifacts
 ENV STORAGE_PATH=/data/artifacts
+ENV NODE_ENV=production
 
-# Start server — use node_modules/.bin directly to avoid npx overhead
+# Start server
 CMD ["node_modules/.bin/tsx", "server/index.ts"]
