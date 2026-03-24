@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=dist-server/index.mjs --external:pg-boss --external:@anthropic-ai/sdk --external:jsonwebtoken --external:bcryptjs --external:cors --external:express --external:express-rate-limit --external:multer --external:uuid --external:postgres --external:drizzle-orm",
     "lint": "eslint .",
     "preview": "vite preview",
     "db:generate": "drizzle-kit generate",

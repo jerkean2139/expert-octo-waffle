@@ -10,19 +10,14 @@ RUN npm run build
 FROM node:20-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm install tsx
+RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/tsconfig.node.json ./tsconfig.node.json
-
-# Copy drizzle migrations if they exist (generated via npm run db:generate)
-RUN mkdir -p ./drizzle
+COPY --from=builder /app/dist-server ./dist-server
 
 # Create artifact storage directory (Railway Volume mounts here)
 RUN mkdir -p /data/artifacts
 ENV STORAGE_PATH=/data/artifacts
 ENV NODE_ENV=production
 
-# Start server
-CMD ["node_modules/.bin/tsx", "server/index.ts"]
+# Start pre-compiled server (no tsx needed at runtime)
+CMD ["node", "dist-server/index.mjs"]
